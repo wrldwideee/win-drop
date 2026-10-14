@@ -111,6 +111,10 @@ impl AirDropBleService {
                     };
 
                     let rssi = args.RawSignalStrengthInDBm().unwrap_or(-80) as i8;
+                    // Ignore weak or invalid frames (e.g. -127 dBm ghost entries)
+                    if rssi <= -100 {
+                        return Ok(());
+                    }
 
                     let ad = match args.Advertisement() {
                         Ok(ad) => ad,
@@ -142,11 +146,11 @@ impl AirDropBleService {
 
                             let type_byte = bytes[0];
                             let dev_name = match type_byte {
-                                0x05 => "Apple iPhone (AirDrop)",
-                                0x10 => "Apple Device (Nearby)",
-                                0x07 => "Apple Device (Proximity)",
-                                0x09 => "Apple Mac (AirDrop)",
-                                0x0f => "Apple Device (Continuity)",
+                                0x05 => "Apple Device (AirDrop Active)",
+                                0x10 => "iPad / iPhone (Nearby Info)",
+                                0x07 => "AirPods / Beats (Proximity)",
+                                0x09 => "Mac / iPad (AirPlay)",
+                                0x0C | 0x0F | 0x12 => "Apple Device (Continuity)",
                                 _    => "Apple Device",
                             };
 

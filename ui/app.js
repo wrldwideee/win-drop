@@ -29,6 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const driverState = document.getElementById('driver-state');
   const wintunState = document.getElementById('wintun-state');
   const peerCountText = document.getElementById('peer-count-text');
+  const ipadUrlText = document.getElementById('ipad-url-text');
+  const receivedFilesTray = document.getElementById('received-files-tray');
+  const receivedFilesList = document.getElementById('received-files-list');
+
+  // Relative API base when served over HTTP/HTTPS, fallback to localhost:8770 on file://
+  const API_BASE = window.location.protocol.startsWith('http') ? '' : 'http://localhost:8770';
+
+  if (ipadUrlText && window.location.protocol.startsWith('http')) {
+    ipadUrlText.textContent = window.location.origin;
+  }
 
   let rxCount = 1842;
   let txCount = 438;
@@ -137,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Live awdl-daemon REST Telemetry Polling (every 1000 ms) ---
   async function pollDaemonStatus() {
     try {
-      const res = await fetch('http://localhost:8770/api/status', {
+      const res = await fetch(`${API_BASE}/api/status`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       });
@@ -160,16 +170,27 @@ document.addEventListener('DOMContentLoaded', () => {
         ipv6Addr.textContent = data.self_ipv6;
       }
       if (driverState) {
-        driverState.textContent = data.fw_loaded ? 'RUNNING (LIVE)' : 'NO FW';
+        driverState.textContent = data.fw_loaded ? 'RUNNING (LIVE)' : 'HYBRID WI-FI';
       }
       if (wintunState) {
-        wintunState.textContent = 'awdl0 UP';
+        wintunState.textContent = data.fw_loaded ? 'awdl0 UP' : 'LAN ONLY';
       }
       if (peerCountText && typeof data.peer_count === 'number') {
         peerCountText.textContent = `${data.peer_count} Apple Device${data.peer_count === 1 ? '' : 's'} in Range`;
       }
       if (Array.isArray(data.peers) && data.peers.length > 0) {
         updateRadarPeers(data.peers);
+      }
+
+      // Update Received Files Tray
+      if (receivedFilesTray && receivedFilesList && Array.isArray(data.files) && data.files.length > 0) {
+        receivedFilesTray.style.display = 'block';
+        receivedFilesList.innerHTML = data.files.map(f => `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+            <span><i class="fa-regular fa-file" style="margin-right: 6px; color: var(--accent-cyan);"></i>${f}</span>
+            <span style="font-size: 10px; color: var(--accent-success);"><i class="fa-solid fa-check"></i> Saved</span>
+          </div>
+        `).join('');
       }
 
       // Live Sequence Numbers & Packet Log
@@ -260,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Inject Test PSF Button (Wires to live /api/inject-psf with fallback)
   btnInjectPsf.addEventListener('click', async () => {
     try {
-      const res = await fetch('http://localhost:8770/api/inject-psf', {
+      const res = await fetch(`${API_BASE}/api/inject-psf`, {
         method: 'POST',
         headers: { 'Accept': 'application/json' }
       });
@@ -307,40 +328,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  function handleFiles(files) {
-    const file = files[0];
-    const totalSizeMb = (files.reduce((acc, f) => acc + f.size, 0) / (1024 * 1024)).toFixed(1);
-    const summary = files.length === 1 ? file.name : `${files.length} files (${totalSizeMb} MB)`;
-
+  // Real File Upload to Win-Drop AirDrop Engine via POST /Ask & POST /Upload
+  async function handleFiles(files) {
+    if (!files || files.length === 0) return;
     transferProgressBox.style.display = 'block';
-    transferFilename.textContent = `Sending "${summary}" to ${selectedPeer}`;
-    transferBar.style.width = '0%';
 
-    addLog('AirDrop', `Initiating POST /Ask to ${selectedPeer} on [fe80::...]:8770`, true);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+      transferFilename.textContent = `AirDropping "${file.name}" (${sizeMb} MB) to ${selectedPeer}...`;
+      transferBar.style.width = '15%';
+      transferRate.textContent = 'Negotiating /Ask...';
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 15) + 10;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        transferBar.style.width = '100%';
-        transferRate.textContent = 'Complete!';
-        addLog('AirDrop', `Transfer complete! ${summary} accepted & saved by ${selectedPeer}`, true);
+      addLog('AirDrop', `Initiating POST /Ask for "${file.name}" (${file.size} bytes) to ${selectedPeer}`, true);
 
-        setTimeout(() => {
-          transferProgressBox.style.display = 'none';
-          transferRate.textContent = '48.2 MB/s';
-        }, 3000);
-      } else {
-        transferBar.style.width = progress + '%';
-        const rate = (40 + Math.random() * 15).toFixed(1);
-        transferRate.textContent = `${rate} MB/s`;
-        txCount += 4;
-        txCounter.textContent = txCount.toLocaleString();
-        addLog('DATA', `QoS Data Chunk -> Encap AWDL Frame (${progress}% complete)`, true);
+      try {
+        // Step 1: Propose transfer via POST /Ask
+        await fetch(`${API_BASE}/Ask`, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          body: JSON.stringify({ filename: file.name, size: file.size })
+        });
+        transferBar.style.width = '35%';
+        transferRate.textContent = 'Streaming /Upload...';
+
+        // Step 2: Stream file payload via POST /Upload with X-File-Name preserved
+        addLog('AirDrop', `Streaming payload chunks for "${file.name}" with preserved filename...`, true);
+        const startTime = Date.now();
+        const uploadRes = await fetch(`${API_BASE}/Upload`, {
+          method: 'POST',
+          headers: {
+            'X-File-Name': encodeURIComponent(file.name),
+            'Content-Type': file.type || 'application/octet-stream'
+          },
+          body: file
+        });
+
+        const elapsedSec = Math.max(0.05, (Date.now() - startTime) / 1000);
+        const speedMbS = (file.size / (1024 * 1024) / elapsedSec).toFixed(1);
+
+        if (uploadRes.ok) {
+          transferBar.style.width = '100%';
+          transferRate.textContent = `${speedMbS} MB/s (Saved!)`;
+          txCount += Math.max(1, Math.ceil(file.size / 1400));
+          txCounter.textContent = txCount.toLocaleString();
+          addLog('AirDrop', `Transfer complete! "${file.name}" verified & saved in downloads/AirDrop (${speedMbS} MB/s)`, true);
+        } else {
+          throw new Error(`Server returned HTTP ${uploadRes.status}`);
+        }
+      } catch (err) {
+        addLog('AirDrop', `Transfer error for "${file.name}": ${err.message}`, true);
+        transferRate.textContent = 'Error';
       }
-    }, 200);
+    }
+
+    setTimeout(() => {
+      transferProgressBox.style.display = 'none';
+      transferRate.textContent = 'Idle';
+    }, 4000);
+
+    // Refresh telemetry immediately to show the newly saved file
+    pollDaemonStatus();
   }
 
   // Incoming Modal Demo

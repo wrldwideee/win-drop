@@ -23,6 +23,10 @@
       </div>
 
       <div class="header-status-group">
+        <div class="status-badge" style="background: rgba(0, 113, 227, 0.15); border-color: rgba(0, 113, 227, 0.35);">
+          <i class="fa-solid fa-tablet-screen-button" style="color: var(--accent-apple);"></i>
+          <span>iPad Safari: <strong id="ipad-url-text">http://&lt;lan-ip&gt;:8770</strong></span>
+        </div>
         <div class="status-badge">
           <span class="status-dot active"></span>
           <span>KMDF Driver: <strong id="driver-state">RUNNING</strong></span>
@@ -190,6 +194,14 @@
             </div>
             <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
               <div id="transfer-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); transition: width 0.1s linear;"></div>
+            </div>
+          </div>
+          <!-- Received Files Tray -->
+          <div id="received-files-tray" style="display: none; width: 100%; margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);">
+            <div style="font-size: 11px; text-transform: uppercase; color: var(--accent-cyan); letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-download"></i> Received Files (downloads/AirDrop)
+            </div>
+            <div id="received-files-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 85px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px; color: var(--text-main);">
             </div>
           </div>
         </div>

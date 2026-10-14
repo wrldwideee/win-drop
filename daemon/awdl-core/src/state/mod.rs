@@ -298,6 +298,20 @@ impl AwdlStateMachine {
             entry.hostname = Some(h);
         }
     }
+
+    /// Retrieve the top active peers seen within the last 30s with valid RSSI, sorted descending by signal strength
+    pub fn get_top_peers(&self, limit: usize) -> Vec<PeerInfo> {
+        let now = Instant::now();
+        let mut list: Vec<PeerInfo> = self
+            .peers
+            .values()
+            .filter(|p| now.duration_since(p.last_seen).as_secs() <= 30 && p.rssi > -100)
+            .cloned()
+            .collect();
+        list.sort_by(|a, b| b.rssi.cmp(&a.rssi));
+        list.truncate(limit);
+        list
+    }
 }
 
 /// Long-running task for processing incoming frames into the state machine
