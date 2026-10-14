@@ -1,0 +1,11 @@
+target/
+*.obj
+*.pdb
+*.cer
+*.tlog
+*.lastbuildstate
+x64/
+Debug/
+Release/
+*.recipe
+*.log

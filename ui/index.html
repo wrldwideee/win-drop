@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WIN-DROP — Native Windows AirDrop Interoperability (MediaTek MT7922 / AMD RZ616)</title>
+  <meta name="description" content="High-performance native Windows 11 Apple AirDrop & AWDL protocol engine for MediaTek MT7922 / AMD RZ616 silicon.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-brands fa-apple"></i>
+        </div>
+        <div class="brand-text">
+          <h1>WIN-DROP</h1>
+          <p>AWDL PROTOCOL ENGINE &bull; MT7922 / RZ616</p>
+        </div>
+      </div>
+
+      <div class="header-status-group">
+        <div class="status-badge">
+          <span class="status-dot active"></span>
+          <span>KMDF Driver: <strong id="driver-state">RUNNING</strong></span>
+        </div>
+        <div class="status-badge">
+          <span class="status-dot"></span>
+          <span>Wintun: <strong id="wintun-state">awdl0 UP</strong></span>
+        </div>
+        <button id="btn-trigger-modal" class="btn-secondary" title="Test AirDrop incoming prompt">
+          <i class="fa-solid fa-bell"></i> Demo Incoming
+        </button>
+      </div>
+    </header>
+
+    <!-- Main 3-Column Grid -->
+    <main class="main-content">
+      <!-- Left Column: Hardware & Kernel Telemetry HUD -->
+      <aside class="glass-panel" id="telemetry-panel">
+        <div class="panel-header">
+          <h2 class="panel-title"><i class="fa-solid fa-microchip"></i> Hardware Telemetry</h2>
+          <span class="metric-tag">PCIe x1 Gen3</span>
+        </div>
+
+        <div class="telemetry-list">
+          <div class="metric-item">
+            <span class="metric-label">Target Silicon</span>
+            <span class="metric-value">
+              <span>MediaTek MT7922</span>
+              <span class="highlight">14C3:7922</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Verified Chip ID</span>
+            <span class="metric-value">
+              <span id="chip-id-val">0x79220000</span>
+              <span class="metric-tag">MATCH</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">BAR0 MMIO Base</span>
+            <span class="metric-value">
+              <span>0xFE000000</span>
+              <span class="metric-tag">1024 KB</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Firmware Subsystem</span>
+            <span class="metric-value">
+              <span>MCU Patch 1.1 + RAM</span>
+              <span class="metric-tag">BOOTED</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Radio & Filter Mode</span>
+            <span class="metric-value">
+              <span id="radio-mode">Promiscuous Monitor</span>
+              <span class="highlight" id="filter-state">ACTIVE</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">AWDL Channel Hop</span>
+            <span class="metric-value">
+              <span id="current-channel">CH 44 (5.220 GHz)</span>
+              <span class="highlight">102.4 ms TU</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Master Election State</span>
+            <span class="metric-value">
+              <span id="election-role">ROLE: MASTER</span>
+              <span class="highlight">Metric: 0x00100000</span>
+            </span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">IPv6 Link-Local Interface</span>
+            <span class="metric-value">
+              <span id="ipv6-addr">fe80::0217:f2ff:fe3a:91c2</span>
+              <span class="metric-tag">awdl0</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="controls-box">
+          <button id="btn-toggle-monitor" class="btn-primary">
+            <i class="fa-solid fa-satellite-dish"></i> Toggle Monitor Mode
+          </button>
+          <button id="btn-inject-psf" class="btn-secondary">
+            <i class="fa-solid fa-paper-plane"></i> Inject Test PSF Action Frame
+          </button>
+        </div>
+      </aside>
+
+      <!-- Center Column: Radar Discovery & File Drop Target -->
+      <section class="center-viewport">
+        <!-- AWDL Radar View -->
+        <div class="glass-panel radar-card" id="radar-container">
+          <div class="panel-header" style="position: absolute; top: 20px; left: 24px; right: 24px; z-index: 20;">
+            <h2 class="panel-title"><i class="fa-solid fa-radar"></i> AWDL Peer Proximity Radar</h2>
+            <span class="status-badge" style="padding: 4px 10px; font-size: 11px;">
+              <span class="status-dot"></span>
+              <span id="peer-count-text">3 Apple Devices in Range</span>
+            </span>
+          </div>
+
+          <!-- Radar Background concentric circles and sweep -->
+          <div class="radar-bg"></div>
+          <div class="radar-sweep"></div>
+
+          <!-- Self Node (Center of Radar) -->
+          <div class="radar-center-node" title="This PC (Win-Drop Master)">
+            <i class="fa-brands fa-windows" style="color: var(--accent-cyan);"></i>
+          </div>
+
+          <!-- Discovered Peers (Dynamically Rendered / Initial State) -->
+          <div id="radar-peers-layer">
+            <div class="peer-node active" id="peer-1" style="top: 85px; left: 160px;" data-name="Alex's iPhone 15 Pro" data-model="iPhone 15 Pro" data-rssi="-48 dBm">
+              <div class="peer-avatar">
+                <i class="fa-solid fa-mobile-screen-button"></i>
+              </div>
+              <span class="peer-name">Alex's iPhone 15 Pro</span>
+            </div>
+
+            <div class="peer-node" id="peer-2" style="top: 130px; right: 120px;" data-name="Sarah's MacBook Pro" data-model="MacBook Pro 16\"" data-rssi="-59 dBm">
+              <div class="peer-avatar">
+                <i class="fa-solid fa-laptop"></i>
+              </div>
+              <span class="peer-name">Sarah's MacBook Pro</span>
+            </div>
+
+            <div class="peer-node" id="peer-3" style="bottom: 75px; left: 220px;" data-name="Living Room iPad Air" data-model="iPad Air M2" data-rssi="-71 dBm">
+              <div class="peer-avatar">
+                <i class="fa-solid fa-tablet-screen-button"></i>
+              </div>
+              <span class="peer-name">iPad Air M2</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AirDrop Drag & Drop Zone -->
+        <div class="glass-panel dropzone-card" id="dropzone">
+          <div class="drop-icon-wrap">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <div class="drop-instruction">
+            <h3>Drop Files Here to AirDrop</h3>
+            <p id="drop-target-label">Select a nearby Apple peer above or drop files directly to broadcast</p>
+          </div>
+          <input type="file" id="file-input" multiple style="display: none;">
+          <button id="btn-browse-files" class="btn-secondary">
+            <i class="fa-solid fa-folder-open"></i> Choose Files
+          </button>
+          
+          <!-- Transfer Progress Overlay -->
+          <div id="transfer-progress-box" style="display: none; width: 100%; margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span id="transfer-filename">Uploading...</span>
+              <span id="transfer-rate">48.2 MB/s</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+              <div id="transfer-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); transition: width 0.1s linear;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Live Sniffer Terminal & Packet Stream -->
+      <aside class="glass-panel" id="sniffer-panel">
+        <div class="panel-header">
+          <h2 class="panel-title"><i class="fa-solid fa-terminal"></i> 802.11 Monitor Stream</h2>
+          <button id="btn-clear-log" class="btn-secondary" style="padding: 4px 8px; font-size: 11px;">Clear</button>
+        </div>
+
+        <div class="terminal-window" id="packet-terminal">
+          <!-- Live packet lines injected by JS -->
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+          <span>Frames RX: <strong id="rx-counter" style="color: var(--accent-cyan);">1,842</strong></span>
+          <span>Frames TX: <strong id="tx-counter" style="color: var(--accent-success);">438</strong></span>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Incoming AirDrop Request Modal -->
+    <div class="modal-overlay" id="airdrop-modal">
+      <div class="airdrop-modal-box">
+        <div class="modal-icon">
+          <i class="fa-solid fa-file-arrow-down"></i>
+        </div>
+        <div class="modal-text">
+          <h2>AirDrop Transfer Request</h2>
+          <p id="modal-desc"><strong>Alex's iPhone 15 Pro</strong> would like to share 2 photos and 1 document (14.2 MB) with you.</p>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-modal-decline" class="btn-decline">Decline</button>
+          <button id="btn-modal-accept" class="btn-accept">Accept &amp; Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>WIN-DROP v1.0.0 &bull; KMDF 1.33 / WDF PCIe Driver &bull; MT7922 / AMD RZ616</span>
+      <span>AWDL Master Election TSF: <span id="tsf-counter">0x004F382A</span> &bull; 102.4 ms Cycle</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

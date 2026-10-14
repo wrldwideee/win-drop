@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  mt7922_awdl.vcxproj
+  Visual Studio 2022 + WDK 10.0.26100 KMDF driver project
+  
+  Build instructions:
+    1. Install Visual Studio 2022 + WDK 10.0.26100.0
+    2. Open this project (or the .sln) in VS2022
+    3. Select configuration: Debug|x64 or Release|x64
+    4. Build -> Build Solution
+    
+  Output: $(OutDir)\mt7922_awdl.sys + mt7922_awdl.inf + mt7922_awdl.cat
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+    <TemplateGuid>{1bc93493-3a3e-4fd5-9003-6d7d0e09da74}</TemplateGuid>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <ProjectName>mt7922_awdl</ProjectName>
+    <TargetPlatformVersion Condition="'$(TargetPlatformVersion)'==''">10.0.26100.0</TargetPlatformVersion>
+    <WindowsTargetPlatformVersion Condition="'$(WindowsTargetPlatformVersion)'==''">10.0.26100.0</WindowsTargetPlatformVersion>
+    <WDKContentRoot Condition="'$(WDKContentRoot)'==''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Kits\Installed Roots@KitsRoot10)</WDKContentRoot>
+    <WDKBuildFolder Condition="'$(WDKBuildFolder)'==''">10.0.26100.0</WDKBuildFolder>
+    <KMDF_Version_Major Condition="'$(KMDF_Version_Major)'==''">1</KMDF_Version_Major>
+    <KMDF_Version_Minor Condition="'$(KMDF_Version_Minor)'==''">35</KMDF_Version_Minor>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_VERSION_MINOR>35</KMDF_VERSION_MINOR>
+    <KmdfVersion>1.35</KmdfVersion>
+    <KMDF_LIB_PATH Condition="'$(KMDF_LIB_PATH)'==''">$(WDKContentRoot)Lib\wdf\kmdf\$(Platform)\</KMDF_LIB_PATH>
+    <KMDF_VER_PATH Condition="'$(KMDF_VER_PATH)'==''">$(KMDF_Version_Major).$(KMDF_Version_Minor)</KMDF_VER_PATH>
+    <DDK_LIB_PATH Condition="'$(DDK_LIB_PATH)'==''">$(WDKContentRoot)Lib\$(TargetPlatformVersion)\km\$(Platform)\</DDK_LIB_PATH>
+    <KernelBufferOverflowLib Condition="'$(KernelBufferOverflowLib)'==''">$(DDK_LIB_PATH)BufferOverflowFastFailK.lib</KernelBufferOverflowLib>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' &gt; '17.0'">17.0</VisualStudioVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.Default.props"/>
+
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <PlatformToolset>v145</PlatformToolset>
+    <KMDF_Version_Major>1</KMDF_Version_Major>
+    <KMDF_Version_Minor>35</KMDF_Version_Minor>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_VERSION_MINOR>35</KMDF_VERSION_MINOR>
+    <KmdfVersion>1.35</KmdfVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <TargetVersion>Windows10</TargetVersion>
+    <EnableInf2cat>false</EnableInf2cat>
+    <DrvCatAdditionalOptions>/force</DrvCatAdditionalOptions>
+    <SkipPackageVerification>true</SkipPackageVerification>
+    <DisableInfVerif>true</DisableInfVerif>
+    <ApiValidator_Enable>false</ApiValidator_Enable>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <PlatformToolset>v145</PlatformToolset>
+    <KMDF_Version_Major>1</KMDF_Version_Major>
+    <KMDF_Version_Minor>35</KMDF_Version_Minor>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_VERSION_MINOR>35</KMDF_VERSION_MINOR>
+    <KmdfVersion>1.35</KmdfVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <TargetVersion>Windows10</TargetVersion>
+    <EnableInf2cat>false</EnableInf2cat>
+    <DrvCatAdditionalOptions>/force</DrvCatAdditionalOptions>
+    <SkipPackageVerification>true</SkipPackageVerification>
+    <DisableInfVerif>true</DisableInfVerif>
+    <ApiValidator_Enable>false</ApiValidator_Enable>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.Common.props"/>
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.KernelMode.Default.props"/>
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.KernelMode.props"/>
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.KernelMode.LateEvaluation.props"/>
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.LateEvaluation.props"/>
+
+  <!-- ======================================================================
+       Compiler settings
+       ====================================================================== -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WDKContentRoot)Include\$(TargetPlatformVersion)\km;$(WDKContentRoot)Include\$(TargetPlatformVersion)\shared;$(WDKContentRoot)Include\wdf\kmdf\1.35;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_AMD64_;_WIN64;WIN32_LEAN_AND_MEAN;NTDDI_VERSION=0x0A000008;_NTDDI_VERSION_FROM_WIN32_WINNT_=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level4</WarningLevel>
+      <!-- Treat C4100 (unreferenced parameter) as warning, not error,
+           since WDF callbacks leave some params unused by design -->
+      <DisableSpecificWarnings>4100;4201</DisableSpecificWarnings>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <EnablePREfast>false</EnablePREfast>
+      <!-- Align to 8 bytes for DMA descriptor structs -->
+      <StructMemberAlignment>Default</StructMemberAlignment>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(WDKContentRoot)Lib\$(TargetPlatformVersion)\km\x64;$(WDKContentRoot)Lib\wdf\kmdf\x64\1.35;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ntstrsafe.lib;ntoskrnl.lib;hal.lib;WdfLdr.lib;WdfDriverEntry.lib;BufferOverflowFastFailK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EntryPointSymbol>FxDriverEntry</EntryPointSymbol>
+      <SubSystem>Native</SubSystem>
+      <Driver>Driver</Driver>
+    </Link>
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(WDKContentRoot)Include\$(TargetPlatformVersion)\km;$(WDKContentRoot)Include\$(TargetPlatformVersion)\shared;$(WDKContentRoot)Include\wdf\kmdf\1.35;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_AMD64_;_WIN64;WIN32_LEAN_AND_MEAN;NTDDI_VERSION=0x0A000008;_NTDDI_VERSION_FROM_WIN32_WINNT_=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level4</WarningLevel>
+      <DisableSpecificWarnings>4100;4201</DisableSpecificWarnings>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <Optimization>Full</Optimization>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(WDKContentRoot)Lib\$(TargetPlatformVersion)\km\x64;$(WDKContentRoot)Lib\wdf\kmdf\x64\1.35;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ntstrsafe.lib;ntoskrnl.lib;hal.lib;WdfLdr.lib;WdfDriverEntry.lib;BufferOverflowFastFailK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EntryPointSymbol>FxDriverEntry</EntryPointSymbol>
+      <SubSystem>Native</SubSystem>
+      <Driver>Driver</Driver>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+  </ItemDefinitionGroup>
+
+  <!-- ======================================================================
+       Source files
+       ====================================================================== -->
+  <ItemGroup>
+    <ClCompile Include="mt7922_init.c"/>
+    <ClCompile Include="mt7922_dma.c"/>
+    <ClCompile Include="mt7922_fw.c"/>
+    <ClCompile Include="mt7922_ioctl.c"/>
+    <ClCompile Include="mt7922_isr.c"/>
+    <ClCompile Include="mt7922_radio.c"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="mt7922_awdl.h"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <inf Include="mt7922_awdl.inf"/>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(WDKContentRoot)build\$(TargetPlatformVersion)\WindowsDriver.Common.targets"/>
+
+</Project>

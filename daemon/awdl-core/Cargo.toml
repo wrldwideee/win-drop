@@ -1,0 +1,59 @@
+[package]
+name    = "awdl-core"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "awdl-daemon"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime — high-priority event loops for 102.4 ms AWDL windows
+tokio       = { version = "1", features = ["full"] }
+
+# Zero-copy frame parsing
+zerocopy    = { version = "0.7", features = ["derive"] }
+nom         = "7"
+bytes       = "1"
+
+# Logging
+tracing             = "0.1"
+tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
+
+anyhow     = "1.0"
+
+# Windows kernel IOCTL interface (replaces winapi for modern Rust)
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_Storage_FileSystem",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+] }
+
+# mDNS / DNS-SD (Phase 4)
+mdns-sd     = "0.11"
+
+# TLS 1.3 (Phase 4 — AirDrop HTTPS)
+rustls      = { version = "0.23", features = ["ring"] }
+tokio-rustls = "0.26"
+
+# Plist parsing for AirDrop.plist (Phase 4)
+plist       = "1"
+
+# Hex dump for debug
+hex         = "0.4"
+
+[profile.dev]
+incremental = false
+codegen-units = 1
+
+[profile.release]
+# Minimize latency for the 102.4 ms channel scheduler
+opt-level   = 3
+codegen-units = 1
+incremental = false
+lto         = true
+panic       = "abort"

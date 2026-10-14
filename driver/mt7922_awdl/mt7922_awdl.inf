@@ -1,0 +1,102 @@
+; mt7922_awdl.inf - Driver installation descriptor
+; Target: Windows 11 x64  (MediaTek MT7922 / AMD RZ616)
+; Signing: Test-signing mode during development. Production requires WHQL/EV cert.
+;
+; SPDX-License-Identifier: MIT
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = %ManufacturerName%
+DriverVer = 10/14/2026,13.25.0.0
+CatalogFile = mt7922_awdl.cat
+PnpLockdown = 1
+
+[Manufacturer]
+%ManufacturerName% = StandardInstall, NTamd64
+
+[StandardInstall.NTamd64]
+; MediaTek MT7922
+%DeviceDesc% = MT7922_Install, PCI\VEN_14C3&DEV_7922
+; AMD RZ616 (rebadged MT7922)
+%DeviceDesc% = MT7922_Install, PCI\VEN_14C3&DEV_0616&SUBSYS_E0DF105B
+%DeviceDesc% = MT7922_Install, PCI\VEN_14C3&DEV_0616
+
+; ============================================================================
+; Install section
+; ============================================================================
+[MT7922_Install]
+AddReg    = MT7922_AddReg
+CopyFiles = MT7922_CopyFiles
+
+[MT7922_Install.NTamd64]
+AddReg    = MT7922_AddReg
+CopyFiles = MT7922_CopyFiles
+
+[MT7922_Install.Services]
+AddService = mt7922_awdl, 0x00000002, MT7922_Service_Install
+
+[MT7922_Install.NTamd64.Services]
+AddService = mt7922_awdl, 0x00000002, MT7922_Service_Install
+
+[MT7922_Install.Wdf]
+KmdfService = mt7922_awdl, MT7922_wdfsect
+
+[MT7922_Install.NTamd64.Wdf]
+KmdfService = mt7922_awdl, MT7922_wdfsect
+
+[MT7922_wdfsect]
+KmdfLibraryVersion = 1.35
+
+[MT7922_Install.HW]
+AddReg = MT7922_HW_AddReg
+
+[MT7922_Install.NTamd64.HW]
+AddReg = MT7922_HW_AddReg
+
+[MT7922_HW_AddReg]
+; Enable MSI interrupts
+HKR, Interrupt Management,                      ,   0x00000010
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported,     0x00010001, 1
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit,0x00010001,4
+
+[MT7922_AddReg]
+; Driver-specific registry values
+HKR,, WinDropDriverVersion, 0x00000000, "1.0.0.1"
+HKR,, FirmwarePath,         0x00000000, "%SystemRoot%\System32\drivers"
+HKR,, AwdlSocialChannel44,  0x00010001, 44
+HKR,, AwdlSocialChannel149, 0x00010001, 149
+
+[MT7922_Service_Install]
+DisplayName    = %ServiceName%
+ServiceType    = 1   ; SERVICE_KERNEL_DRIVER
+StartType      = 3   ; SERVICE_DEMAND_START
+ErrorControl   = 1   ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\mt7922_awdl.sys
+
+[MT7922_CopyFiles]
+mt7922_awdl.sys
+
+; ============================================================================
+; Source / Destination directories
+; ============================================================================
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+mt7922_awdl.sys  = 1,,
+
+[DestinationDirs]
+DefaultDestDir   = 12   ; %windir%\System32\drivers
+MT7922_CopyFiles = 12
+
+; ============================================================================
+; Strings
+; ============================================================================
+[Strings]
+ManufacturerName = "WinDrop Project"
+DeviceDesc       = "MediaTek MT7922 AWDL Radio Controller"
+ServiceName      = "MT7922 AWDL Driver"
+DiskName         = "MT7922 AWDL Driver Installation Disk"
+
