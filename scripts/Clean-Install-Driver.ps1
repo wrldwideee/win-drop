@@ -41,6 +41,7 @@ if ($oemList) {
 
 # 3. Clean up old driver binary in System32\drivers and reset debug log
 Write-Host "`n[3/5] Cleaning up stale driver binaries..." -ForegroundColor Cyan
+Remove-Item "$PSScriptRoot\..\windrop_debug.log" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:SystemRoot\windrop_debug.log" -Force -ErrorAction SilentlyContinue
 $sysPath = "$env:SystemRoot\System32\drivers\mt7922_awdl.sys"
 if (Test-Path $sysPath) {
@@ -84,7 +85,7 @@ if ($dev) {
     Write-Host "    Service       : $($dev.Service)" -ForegroundColor Green
 
     # Show kernel debug trace log if generated
-    $logPath = "$env:SystemRoot\windrop_debug.log"
+    $logPath = "$PSScriptRoot\..\windrop_debug.log"
     if (Test-Path $logPath) {
         Write-Host "`n=== Kernel Driver Execution Log ($logPath) ===" -ForegroundColor Cyan
         Get-Content $logPath | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }

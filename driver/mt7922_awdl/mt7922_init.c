@@ -13,7 +13,7 @@
 #define MT_TAG_DMA      'tM7D'
 
 /* -------------------------------------------------------------------------
- * Kernel logging helper: writes to \SystemRoot\windrop_debug.log
+ * Kernel logging helper: writes to project windrop_debug.log
  * Only writes when running at PASSIVE_LEVEL.
  * ------------------------------------------------------------------------- */
 VOID
@@ -41,11 +41,11 @@ WinDropLog(
 
     RtlStringCbLengthA(buffer, sizeof(buffer), &len);
 
-    RtlInitUnicodeString(&path, L"\\SystemRoot\\windrop_debug.log");
+    RtlInitUnicodeString(&path, L"\\DosDevices\\C:\\Users\\ROG ZEPHYRUS\\Documents\\PROJECTS\\win-drop\\windrop_debug.log");
     InitializeObjectAttributes(&oa, &path, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
 
     status = ZwCreateFile(&handle,
-                          FILE_APPEND_DATA | SYNCHRONIZE,
+                          FILE_GENERIC_WRITE | SYNCHRONIZE,
                           &oa,
                           &iosb,
                           NULL,
@@ -117,7 +117,7 @@ EvtDeviceAdd(
     WDFQUEUE                     readQueue;
     DECLARE_CONST_UNICODE_STRING(ntDeviceName, L"\\Device\\AwdlRadio0");
     DECLARE_CONST_UNICODE_STRING(dosDeviceName, L"\\DosDevices\\AwdlRadioDevice");
-    DECLARE_CONST_UNICODE_STRING(sddlString, L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;WD)");
+    DECLARE_CONST_UNICODE_STRING(sddlString, L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;WD)(A;;GR;;;RC)");
 
     UNREFERENCED_PARAMETER(Driver);
 
@@ -144,9 +144,10 @@ EvtDeviceAdd(
     status = WdfDeviceInitAssignSDDLString(DeviceInit, &sddlString);
     WinDropLog("[WIN-DROP] WdfDeviceInitAssignSDDLString status=0x%08X\n", status);
     if (!NT_SUCCESS(status)) {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                   "mt7922_awdl: WdfDeviceInitAssignSDDLString failed 0x%08X\n", status));
-        return status;
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
+                   "mt7922_awdl: WdfDeviceInitAssignSDDLString warning 0x%08X\n", status));
+        /* Non-fatal: continue even if custom SDDL fails */
+        status = STATUS_SUCCESS;
     }
 
     /* Device context */
