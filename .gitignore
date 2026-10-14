@@ -9,3 +9,4 @@ Debug/
 Release/
 *.recipe
 *.log
+*disasm*.txt

@@ -236,7 +236,7 @@ typedef struct _MT76_MCU_RXD {
  * RX Frame FIFO shared between ISR and IOCTL_AWDL_READ_FRAMES
  * Lock-free single-producer / single-consumer byte ring, power-of-2 size.
  * -------------------------------------------------------------------------- */
-#define RX_FIFO_SIZE   (1UL << 20)   /* 1 MB */
+#define RX_FIFO_SIZE   (16UL * 1024UL)   /* 16 KB - fits within KMDF 64 KB context limit */
 
 typedef struct _RX_FIFO {
     UINT8   Buffer[RX_FIFO_SIZE];

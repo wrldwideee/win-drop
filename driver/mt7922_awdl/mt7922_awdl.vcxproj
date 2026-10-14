@@ -102,7 +102,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(WDKContentRoot)Include\$(TargetPlatformVersion)\km;$(WDKContentRoot)Include\$(TargetPlatformVersion)\shared;$(WDKContentRoot)Include\wdf\kmdf\1.35;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_AMD64_;_WIN64;WIN32_LEAN_AND_MEAN;NTDDI_VERSION=0x0A000008;_NTDDI_VERSION_FROM_WIN32_WINNT_=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_AMD64_;_WIN64;WIN32_LEAN_AND_MEAN;NTDDI_VERSION=0x0A000008;_NTDDI_VERSION_FROM_WIN32_WINNT_=1;KMDF_VERSION_MAJOR=1;KMDF_VERSION_MINOR=35;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <!-- Treat C4100 (unreferenced parameter) as warning, not error,
            since WDF callbacks leave some params unused by design -->
@@ -114,7 +114,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(WDKContentRoot)Lib\$(TargetPlatformVersion)\km\x64;$(WDKContentRoot)Lib\wdf\kmdf\x64\1.35;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ntstrsafe.lib;ntoskrnl.lib;hal.lib;WdfLdr.lib;WdfDriverEntry.lib;BufferOverflowFastFailK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ntstrsafe.lib;wdmsec.lib;ntoskrnl.lib;hal.lib;WdfLdr.lib;WdfDriverEntry.lib;BufferOverflowFastFailK.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EntryPointSymbol>FxDriverEntry</EntryPointSymbol>
       <SubSystem>Native</SubSystem>
       <Driver>Driver</Driver>
@@ -127,20 +127,22 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(WDKContentRoot)Include\$(TargetPlatformVersion)\km;$(WDKContentRoot)Include\$(TargetPlatformVersion)\shared;$(WDKContentRoot)Include\wdf\kmdf\1.35;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_AMD64_;_WIN64;WIN32_LEAN_AND_MEAN;NTDDI_VERSION=0x0A000008;_NTDDI_VERSION_FROM_WIN32_WINNT_=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_AMD64_;_WIN64;WIN32_LEAN_AND_MEAN;NTDDI_VERSION=0x0A000008;_NTDDI_VERSION_FROM_WIN32_WINNT_=1;KMDF_VERSION_MAJOR=1;KMDF_VERSION_MINOR=35;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <DisableSpecificWarnings>4100;4201</DisableSpecificWarnings>
       <TreatWarningAsError>false</TreatWarningAsError>
-      <Optimization>Full</Optimization>
-      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <Optimization>MaxSpeed</Optimization>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(WDKContentRoot)Lib\$(TargetPlatformVersion)\km\x64;$(WDKContentRoot)Lib\wdf\kmdf\x64\1.35;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ntstrsafe.lib;ntoskrnl.lib;hal.lib;WdfLdr.lib;WdfDriverEntry.lib;BufferOverflowFastFailK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ntstrsafe.lib;wdmsec.lib;ntoskrnl.lib;hal.lib;WdfLdr.lib;WdfDriverEntry.lib;BufferOverflowFastFailK.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EntryPointSymbol>FxDriverEntry</EntryPointSymbol>
       <SubSystem>Native</SubSystem>
       <Driver>Driver</Driver>
-      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>false</OptimizeReferences>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
     <DriverSign>
       <FileDigestAlgorithm>sha256</FileDigestAlgorithm>

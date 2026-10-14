@@ -41,22 +41,26 @@ WinDropLog(
 
     RtlStringCbLengthA(buffer, sizeof(buffer), &len);
 
+    LARGE_INTEGER     writeOffset;
+    writeOffset.LowPart  = FILE_WRITE_TO_END_OF_FILE;
+    writeOffset.HighPart = -1;
+
     RtlInitUnicodeString(&path, L"\\DosDevices\\C:\\Users\\ROG ZEPHYRUS\\Documents\\PROJECTS\\win-drop\\windrop_debug.log");
     InitializeObjectAttributes(&oa, &path, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
 
     status = ZwCreateFile(&handle,
-                          FILE_GENERIC_WRITE | SYNCHRONIZE,
+                          FILE_APPEND_DATA | SYNCHRONIZE,
                           &oa,
                           &iosb,
                           NULL,
                           FILE_ATTRIBUTE_NORMAL,
                           FILE_SHARE_READ | FILE_SHARE_WRITE,
                           FILE_OPEN_IF,
-                          FILE_SYNCHRONOUS_IO_NONALERT,
+                          FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE,
                           NULL,
                           0);
     if (NT_SUCCESS(status)) {
-        ZwWriteFile(handle, NULL, NULL, NULL, &iosb, buffer, (ULONG)len, NULL, NULL);
+        ZwWriteFile(handle, NULL, NULL, NULL, &iosb, buffer, (ULONG)len, &writeOffset, NULL);
         ZwClose(handle);
     }
 }
@@ -117,7 +121,7 @@ EvtDeviceAdd(
     WDFQUEUE                     readQueue;
     DECLARE_CONST_UNICODE_STRING(ntDeviceName, L"\\Device\\AwdlRadio0");
     DECLARE_CONST_UNICODE_STRING(dosDeviceName, L"\\DosDevices\\AwdlRadioDevice");
-    DECLARE_CONST_UNICODE_STRING(sddlString, L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;WD)(A;;GR;;;RC)");
+    DECLARE_CONST_UNICODE_STRING(sddlString, L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;WD)");
 
     UNREFERENCED_PARAMETER(Driver);
 
@@ -425,13 +429,14 @@ EvtDeviceD0Entry(
                  MT_INT_TX_DONE_MCU  |
                  MT_INT_MCU_CMD);
 
-    /* Load MCU patch + RAM firmware */
+    /* Load MCU patch + RAM firmware (non-fatal so \\.\AwdlRadioDevice stays accessible) */
     status = Mt7922FirmwareLoad(ctx);
     WinDropLog("[WIN-DROP] Mt7922FirmwareLoad status=0x%08X\n", status);
     if (!NT_SUCCESS(status)) {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                   "mt7922_awdl: Firmware load failed 0x%08X\n", status));
-        return status;
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
+                   "mt7922_awdl: Firmware load warning 0x%08X (continuing in diagnostic mode)\n", status));
+        ctx->FirmwareLoaded = FALSE;
+        status = STATUS_SUCCESS;
     }
 
     /* Replenish RX ring with empty buffers */
