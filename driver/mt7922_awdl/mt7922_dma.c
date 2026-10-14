@@ -114,8 +114,8 @@ Mt7922DmaInit(_In_ PDEVICE_CONTEXT Ctx)
                                &Ctx->TxDescPa);
     if (!NT_SUCCESS(status)) return status;
 
-    /* ---- TX payload staging pool ---- */
-    txDataSize = (SIZE_T)MT7922_MAX_FRAME_SIZE * MT7922_TX_RING_SIZE;
+    /* ---- TX payload staging pool (Data TX ring + MCU TX ring) ---- */
+    txDataSize = (SIZE_T)MT7922_MAX_FRAME_SIZE * (MT7922_TX_RING_SIZE + MT7922_MCU_TX_RING_SIZE);
     status = AllocCommonBuffer(Ctx, txDataSize,
                                &Ctx->TxDataBuffer,
                                (PVOID*)&Ctx->TxDataVa,
@@ -130,8 +130,8 @@ Mt7922DmaInit(_In_ PDEVICE_CONTEXT Ctx)
                                &Ctx->RxDescPa);
     if (!NT_SUCCESS(status)) return status;
 
-    /* ---- RX payload pool: one slot per descriptor ---- */
-    rxDataSize = (SIZE_T)MT7922_MAX_FRAME_SIZE * MT7922_RX_RING_SIZE;
+    /* ---- RX payload pool (Data RX ring + MCU RX ring) ---- */
+    rxDataSize = (SIZE_T)MT7922_MAX_FRAME_SIZE * (MT7922_RX_RING_SIZE + MT7922_MCU_RX_RING_SIZE);
     status = AllocCommonBuffer(Ctx, rxDataSize,
                                &Ctx->RxDataBuffer,
                                (PVOID*)&Ctx->RxDataVa,
@@ -186,6 +186,22 @@ Mt7922DmaInit(_In_ PDEVICE_CONTEXT Ctx)
                     MT_HIF_RX_RING0_CIDX,
                     Ctx->RxDescPa,
                     MT7922_RX_RING_SIZE);
+
+    ProgramRingRegs(Ctx,
+                    MT_HIF_MCU_TX_RING_CTRL0,
+                    MT_HIF_MCU_TX_RING_CTRL1,
+                    MT_HIF_MCU_TX_RING_CTRL2,
+                    MT_HIF_MCU_TX_RING_CIDX,
+                    Ctx->McuTxDescPa,
+                    MT7922_MCU_TX_RING_SIZE);
+
+    ProgramRingRegs(Ctx,
+                    MT_HIF_MCU_RX_RING_CTRL0,
+                    MT_HIF_MCU_RX_RING_CTRL1,
+                    MT_HIF_MCU_RX_RING_CTRL2,
+                    MT_HIF_MCU_RX_RING_CIDX,
+                    Ctx->McuRxDescPa,
+                    MT7922_MCU_RX_RING_SIZE);
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
                "mt7922_dma: Rings initialised. "
@@ -274,6 +290,20 @@ Mt7922DmaRxReplenish(_In_ PDEVICE_CONTEXT Ctx)
     /* Notify hardware: all RX_RING_SIZE slots ready */
     MtWriteReg32(Ctx, MT_HIF_RX_RING0_CIDX, MT7922_RX_RING_SIZE - 1);
     Ctx->RxHead = 0;
+
+    for (i = 0; i < MT7922_MCU_RX_RING_SIZE; i++) {
+        PMT76_RX_DESC mcuDesc = &Ctx->McuRxDescBase[i];
+        PHYSICAL_ADDRESS bufPa;
+
+        bufPa.QuadPart = Ctx->RxDataPa.QuadPart +
+                         (UINT64)(MT7922_RX_RING_SIZE + i) * MT7922_MAX_FRAME_SIZE;
+
+        mcuDesc->BufLo = (UINT32)(bufPa.QuadPart & 0xFFFFFFFFULL);
+        mcuDesc->BufHi = (UINT32)(bufPa.QuadPart >> 32);
+        mcuDesc->Ctrl0 = MT7922_MAX_FRAME_SIZE;
+        mcuDesc->Ctrl1 = 0;
+    }
+    MtWriteReg32(Ctx, MT_HIF_MCU_RX_RING_CIDX, MT7922_MCU_RX_RING_SIZE - 1);
 
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
                "mt7922_dma: RX ring replenished (%u slots)\n",

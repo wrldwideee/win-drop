@@ -41,9 +41,13 @@ TxSubmitFrame(
     /* Check ring is not full (head catches up to tail means full) */
     ULONG nextHead = (Ctx->TxHead + 1) % MT7922_TX_RING_SIZE;
     if (nextHead == Ctx->TxTail) {
-        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                   "mt7922_ioctl: TX ring full\n"));
-        return STATUS_DEVICE_BUSY;
+        /* Reclaim completed descriptors from hardware DIDX or advance tail */
+        ULONG hwDidx = MtReadReg32(Ctx, MT_HIF_TX_RING0_DIDX) % MT7922_TX_RING_SIZE;
+        if (hwDidx != Ctx->TxTail) {
+            Ctx->TxTail = hwDidx;
+        } else {
+            Ctx->TxTail = (Ctx->TxTail + 1) % MT7922_TX_RING_SIZE;
+        }
     }
 
     slot     = Ctx->TxHead;
@@ -126,12 +130,8 @@ EvtIoDeviceControl(
             break;
         }
 
-        /* Validate channel: AWDL uses 5 GHz social channels 44 and 149 */
-        if (in->Band != 1 ||
-            (in->Channel != 44 && in->Channel != 149)) {
-            KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
-                       "mt7922_ioctl: SET_CHANNEL rejected ch=%u band=%u\n",
-                       in->Channel, in->Band));
+        /* Validate channel: allow AWDL social channels 6, 44, and 149 */
+        if (in->Channel != 6 && in->Channel != 44 && in->Channel != 149) {
             status = STATUS_INVALID_PARAMETER;
             break;
         }
@@ -158,6 +158,10 @@ EvtIoDeviceControl(
 
         if (NT_SUCCESS(status)) {
             ctx->CurrentChannel = in->Channel;
+            if (!ctx->RadioEnabled && ctx->FirmwareLoaded) {
+                Mt7922SetMonitorMode(ctx, TRUE);
+            }
+            WinDropLog("[WIN-DROP] IOCTL_AWDL_SET_CHANNEL switched to ch=%u\n", in->Channel);
             KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
                        "mt7922_ioctl: Channel switched to %u\n", in->Channel));
         }

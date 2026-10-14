@@ -116,13 +116,13 @@ static int CmdChannel(HANDLE h, int ch) {
   SET_CHANNEL_IN in = {0};
   DWORD bytes = 0;
 
-  if (ch != 44 && ch != 149) {
-    fprintf(stderr, "[!] AWDL social channels are 44 and 149 only.\n");
+  if (ch != 6 && ch != 44 && ch != 149) {
+    fprintf(stderr, "[!] AWDL social channels are 6, 44, and 149 only.\n");
     return 1;
   }
 
   in.Channel = (uint8_t)ch;
-  in.Band = 1;  /* 5 GHz */
+  in.Band = (ch == 6) ? 0 : 1;  /* 0 = 2.4 GHz, 1 = 5 GHz */
   in.Width = 0; /* 20 MHz */
 
   if (!DeviceIoControl(h, IOCTL_AWDL_SET_CHANNEL, &in, sizeof(in), NULL, 0,
@@ -130,7 +130,7 @@ static int CmdChannel(HANDLE h, int ch) {
     fprintf(stderr, "[!] SET_CHANNEL ioctl failed: %lu\n", GetLastError());
     return 1;
   }
-  printf("[+] Channel switched to %d (5 GHz)\n", ch);
+  printf("[+] Channel switched to %d (%s)\n", ch, (ch == 6) ? "2.4 GHz" : "5 GHz");
   return 0;
 }
 

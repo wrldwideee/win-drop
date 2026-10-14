@@ -442,8 +442,15 @@ EvtDeviceD0Entry(
     /* Replenish RX ring with empty buffers */
     Mt7922DmaRxReplenish(ctx);
 
-    ctx->RadioEnabled    = FALSE;  /* Monitor mode not yet configured */
-    ctx->CurrentChannel  = 0;
+    /* Enable monitor mode and set default AWDL channel 44 */
+    if (ctx->FirmwareLoaded) {
+        UCHAR defaultAwdlMac[6] = { 0x02, 0x17, 0xF2, 0xAA, 0xBB, 0xCC };
+        NTSTATUS radioStatus = Mt7922EnableRadio(ctx, 44, defaultAwdlMac);
+        WinDropLog("[WIN-DROP] Mt7922EnableRadio(ch=44) status=0x%08X\n", radioStatus);
+    } else {
+        ctx->RadioEnabled   = FALSE;
+        ctx->CurrentChannel = 0;
+    }
 
     WinDropLog("[WIN-DROP] EvtDeviceD0Entry complete (FW ver=0x%08X)\n", ctx->FirmwareVersion);
     KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL,
