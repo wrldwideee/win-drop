@@ -1,0 +1,7 @@
+{
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.default.intelliSenseMode": "windows-msvc-x64",
+  "rust-analyzer.check.command": "check",
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 500
+}

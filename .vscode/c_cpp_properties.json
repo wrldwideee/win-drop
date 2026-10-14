@@ -1,15 +1,37 @@
 {
   "configurations": [
     {
-      "name": "Win32",
+      "name": "Kernel Driver",
       "includePath": [
-        "${workspaceFolder}/**",
+        "${workspaceFolder}/driver/**",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/km",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/km/crt",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared",
+        "C:/Program Files (x86)/Windows Kits/10/Include/wdf/kmdf/1.35"
+      ],
+      "defines": [
+        "_AMD64_",
+        "_WIN64",
+        "AMD64",
+        "WINNT=1",
+        "WINVER=0x0A00",
+        "_WIN32_WINNT=0x0A00",
+        "NTDDI_VERSION=0x0A000008",
+        "KMDF_VERSION_MAJOR=1",
+        "KMDF_VERSION_MINOR=35"
+      ],
+      "windowsSdkVersion": "10.0.26100.0",
+      "compilerPath": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+      "cStandard": "c17",
+      "intelliSenseMode": "windows-msvc-x64"
+    },
+    {
+      "name": "Userland",
+      "includePath": [
+        "${workspaceFolder}/userland/**",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um",
-        "C:/Program Files (x86)/Windows Kits/10/Include/wdf/kmdf/1.35",
+        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared",
         "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/include"
       ],
       "defines": [
@@ -17,13 +39,11 @@
         "UNICODE",
         "_UNICODE",
         "_WIN64",
-        "_AMD64_",
-        "NTDDI_VERSION=0x0A000008"
+        "_AMD64_"
       ],
       "windowsSdkVersion": "10.0.26100.0",
       "compilerPath": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
       "cStandard": "c17",
-      "cppStandard": "c++20",
       "intelliSenseMode": "windows-msvc-x64"
     }
   ],
