@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, trace, warn};
 use windows::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows::Win32::Storage::FileSystem::{
-    CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_NONE,
+    CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE,
     OPEN_EXISTING,
 };
 use windows::Win32::System::IO::DeviceIoControl;
@@ -113,7 +113,7 @@ impl RadioDevice {
             CreateFileW(
                 PCWSTR(DEVICE_PATH.as_ptr()),
                 (FILE_READ_DATA | FILE_WRITE_DATA) as u32,
-                FILE_SHARE_NONE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
                 None,
                 OPEN_EXISTING,
                 FILE_ATTRIBUTE_NORMAL,

@@ -227,14 +227,11 @@ EvtIoDeviceControl(
         if (!NT_SUCCESS(status)) break;
 
         /* Atomically read the producer write offset */
-        avail = InterlockedAdd64(
-                    &ctx->RxFifo.WriteOffset,
-                    0)
-                - ctx->RxFifo.ReadOffset;
+        avail = InterlockedAdd64(&ctx->RxFifo.WriteOffset, 0) - ctx->RxFifo.ReadOffset;
 
         if (avail > 0) {
             /* Data available — drain up to outLen bytes right now */
-            SIZE_T toCopy = (SIZE_T)min((LONG64)outLen, avail);
+            SIZE_T toCopy  = (SIZE_T)min((LONG64)outLen, avail);
             LONG64 readOff = ctx->RxFifo.ReadOffset;
             PUCHAR dst     = (PUCHAR)outBuf;
             SIZE_T i;
@@ -243,23 +240,16 @@ EvtIoDeviceControl(
                 dst[i] = ctx->RxFifo.Buffer[readOff % RX_FIFO_SIZE];
                 readOff++;
             }
-            /* Publish updated read offset (consumer side — no lock needed) */
+            /* Publish updated read offset */
             InterlockedExchange64(&ctx->RxFifo.ReadOffset, readOff);
 
             info   = toCopy;
             status = STATUS_SUCCESS;
         } else {
-            /*
-             * No data yet — forward IRP to manual queue.
-             * The DPC will call WdfRequestCompleteWithInformation
-             * once RX data arrives.
-             */
-            status = WdfRequestForwardToIoQueue(Request, ctx->ReadQueue);
-            if (NT_SUCCESS(status)) {
-                /* IRP is now owned by the queue; return without completing */
-                return;
-            }
-            /* Forward failed — complete with error */
+            /* Non-blocking poll: return 0 bytes immediately so synchronous
+             * userland handles (awdl-daemon / inject_test) never deadlock */
+            info   = 0;
+            status = STATUS_SUCCESS;
         }
         break;
     }

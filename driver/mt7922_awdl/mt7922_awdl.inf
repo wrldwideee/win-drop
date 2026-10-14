@@ -9,7 +9,7 @@ Signature   = "$WINDOWS NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer = 10/14/2026,13.25.0.0
+DriverVer = 10/14/2026,14.00.0.0
 CatalogFile = mt7922_awdl.cat
 PnpLockdown = 1
 

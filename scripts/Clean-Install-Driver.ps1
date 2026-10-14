@@ -68,8 +68,8 @@ $dev = Get-PnpDevice -ErrorAction SilentlyContinue |
     Where-Object { $_.HardwareID -match "14C3" -and ($_.HardwareID -match "7922" -or $_.HardwareID -match "0616") } |
     Select-Object -First 1
 
-if ($dev -and $dev.Status -ne "OK") {
-    Write-Host "    Attempting PnP device restart..." -ForegroundColor Yellow
+if ($dev) {
+    Write-Host "    Restarting PnP device to load new driver binary..." -ForegroundColor Yellow
     pnputil /restart-device $dev.InstanceId | Out-Null
     Start-Sleep -Seconds 2
     $dev = Get-PnpDevice -InstanceId $dev.InstanceId -ErrorAction SilentlyContinue

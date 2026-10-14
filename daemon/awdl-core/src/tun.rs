@@ -21,6 +21,12 @@ use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use crate::frame::mac_hdr::{encap_awdl_data_frame, AWDL_BSSID};
 
 // Wintun C API function pointer signatures
+type WintunCreateAdapterFn = unsafe extern "system" fn(
+    name: PCWSTR,
+    tunnel_type: PCWSTR,
+    requested_guid: *const windows::core::GUID,
+) -> *mut std::ffi::c_void;
+
 type WintunOpenAdapterFn = unsafe extern "system" fn(
     pool_name: PCWSTR,
     adapter_name: PCWSTR,
@@ -57,6 +63,7 @@ type WintunReleaseReceivePacketFn = unsafe extern "system" fn(
 
 pub struct WintunApi {
     _module:                      HMODULE,
+    pub create_adapter:           WintunCreateAdapterFn,
     pub open_adapter:             WintunOpenAdapterFn,
     pub close_adapter:            WintunCloseAdapterFn,
     pub start_session:            WintunStartSessionFn,
@@ -89,6 +96,7 @@ impl WintunApi {
 
         Some(Self {
             _module: module,
+            create_adapter:         get_proc!("WintunCreateAdapter", WintunCreateAdapterFn),
             open_adapter:           get_proc!("WintunOpenAdapter", WintunOpenAdapterFn),
             close_adapter:          get_proc!("WintunCloseAdapter", WintunCloseAdapterFn),
             start_session:          get_proc!("WintunStartSession", WintunStartSessionFn),
@@ -128,9 +136,19 @@ impl WintunBridge {
         let pool: Vec<u16> = "WinDrop\0".encode_utf16().collect();
         let name_u16: Vec<u16> = format!("{}\0", adapter_name).encode_utf16().collect();
 
-        let adapter = unsafe { (api.open_adapter)(PCWSTR(pool.as_ptr()), PCWSTR(name_u16.as_ptr())) };
+        let mut adapter = unsafe { (api.open_adapter)(PCWSTR(pool.as_ptr()), PCWSTR(name_u16.as_ptr())) };
         if adapter.is_null() {
-            warn!("Wintun adapter '{}' not currently open — create it with Setup-Wintun.ps1", adapter_name);
+            info!("Wintun adapter '{}' not found, creating adapter...", adapter_name);
+            adapter = unsafe {
+                (api.create_adapter)(
+                    PCWSTR(name_u16.as_ptr()),
+                    PCWSTR(pool.as_ptr()),
+                    std::ptr::null(),
+                )
+            };
+        }
+        if adapter.is_null() {
+            warn!("Failed to open or create Wintun adapter '{}'", adapter_name);
             return Ok(Self {
                 api: Some(api),
                 adapter: std::ptr::null_mut(),

@@ -77,7 +77,8 @@ typedef struct {
  * Open the AWDL device
  * ------------------------------------------------------------------------- */
 static HANDLE OpenDevice(void) {
-  HANDLE h = CreateFileW(DEVICE_PATH, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+  HANDLE h = CreateFileW(DEVICE_PATH, GENERIC_READ | GENERIC_WRITE,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (h == INVALID_HANDLE_VALUE) {
     fprintf(stderr, "[!] Cannot open %ls: error %lu\n", DEVICE_PATH,
