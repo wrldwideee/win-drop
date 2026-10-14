@@ -271,6 +271,33 @@ impl AwdlStateMachine {
             keep
         });
     }
+
+    /// Register or update a peer discovered via BLE or AWDL frames
+    pub fn upsert_peer(&mut self, mac: [u8; 6], hostname: Option<String>, rssi: i8) {
+        let entry = self.peers.entry(mac).or_insert_with(|| {
+            info!(
+                mac = format!("{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]),
+                host = ?hostname,
+                rssi = rssi,
+                "Discovered Apple peer via Continuity BLE"
+            );
+            PeerInfo {
+                mac,
+                ipv6: None,
+                hostname: hostname.clone(),
+                rssi,
+                last_seen: Instant::now(),
+                master_metric: 0,
+                master_counter: 0,
+            }
+        });
+        entry.last_seen = Instant::now();
+        entry.rssi = rssi;
+        if let Some(h) = hostname {
+            entry.hostname = Some(h);
+        }
+    }
 }
 
 /// Long-running task for processing incoming frames into the state machine

@@ -91,6 +91,60 @@ TxSubmitFrame(
 }
 
 /* -------------------------------------------------------------------------
+ * RxFifoLoopbackFrame — feeds an injected frame directly into Ctx->RxFifo
+ * so userland / loopback test tools can verify the RX path without
+ * relying on an external physical peer.
+ * ------------------------------------------------------------------------- */
+static VOID
+RxFifoLoopbackFrame(
+    _In_ PDEVICE_CONTEXT Ctx,
+    _In_reads_bytes_(FrameLen) const UINT8 *FrameData,
+    _In_ UINT32          FrameLen
+)
+{
+    ULONG               hdrSize = FIELD_OFFSET(AWDL_RX_FRAME_HDR, FrameData);
+    ULONG               total   = hdrSize + FrameLen;
+    AWDL_RX_FRAME_HDR   hdr;
+    LARGE_INTEGER       qpc;
+    KIRQL               oldIrql;
+    LONG64              writeOff;
+    ULONG               i;
+
+    KeQueryPerformanceCounter(&qpc);
+
+    hdr.TotalLength = total;
+    hdr.Timestamp   = (UINT64)qpc.QuadPart;
+    hdr.Rssi        = -55; /* Simulated strong RSSI */
+    hdr.Channel     = Ctx->CurrentChannel;
+    hdr.Reserved[0] = 0;
+    hdr.Reserved[1] = 0;
+
+    KeAcquireSpinLock(&Ctx->RxFifo.Lock, &oldIrql);
+
+    writeOff = Ctx->RxFifo.WriteOffset;
+
+    if ((writeOff - Ctx->RxFifo.ReadOffset) + (LONG64)total <= (LONG64)RX_FIFO_SIZE) {
+        PUCHAR hdrBytes = (PUCHAR)&hdr;
+        for (i = 0; i < hdrSize; i++) {
+            Ctx->RxFifo.Buffer[writeOff % RX_FIFO_SIZE] = hdrBytes[i];
+            writeOff++;
+        }
+        for (i = 0; i < FrameLen; i++) {
+            Ctx->RxFifo.Buffer[writeOff % RX_FIFO_SIZE] = FrameData[i];
+            writeOff++;
+        }
+        InterlockedExchange64(&Ctx->RxFifo.WriteOffset, writeOff);
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+                   "mt7922_ioctl: RxFifoLoopbackFrame queued %u bytes\n", FrameLen));
+    } else {
+        KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_WARNING_LEVEL,
+                   "mt7922_ioctl: RxFifoLoopbackFrame FIFO full, dropped %u bytes\n", FrameLen));
+    }
+
+    KeReleaseSpinLock(&Ctx->RxFifo.Lock, oldIrql);
+}
+
+/* -------------------------------------------------------------------------
  * EvtIoDeviceControl — main IOCTL dispatcher
  * ------------------------------------------------------------------------- */
 VOID
@@ -206,6 +260,11 @@ EvtIoDeviceControl(
         status = TxSubmitFrame(ctx,
                                in->FrameData, frameLen,
                                (BOOLEAN)(in->NoAck != 0));
+
+        /* If loopback requested (in->Reserved[0] == 1), also feed into RX FIFO */
+        if (NT_SUCCESS(status) && in->Reserved[0] == 1) {
+            RxFifoLoopbackFrame(ctx, in->FrameData, frameLen);
+        }
         break;
     }
 

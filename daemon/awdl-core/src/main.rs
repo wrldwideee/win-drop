@@ -29,7 +29,7 @@ use driver::RadioDevice;
 use state::AwdlStateMachine;
 use scheduler::ChannelScheduler;
 use tun::WintunBridge;
-use airdrop::{AirDropBonjour, AirDropServer};
+use airdrop::{AirDropBonjour, AirDropServer, AirDropBleService};
 use std::path::PathBuf;
 
 /// Shared raw-frame channel capacities
@@ -138,6 +138,9 @@ async fn main() -> anyhow::Result<()> {
         let _ = bonjour.start_browsing();
         info!("AirDrop Bonjour service announced as 'Win-Drop-PC'");
     }
+
+    // --- Apple Continuity BLE Advertiser & Scanner ---
+    let _ble = AirDropBleService::start(Arc::clone(&state));
 
     info!("All tasks running — AWDL daemon and AirDrop services active");
 

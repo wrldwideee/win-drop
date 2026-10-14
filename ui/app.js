@@ -37,7 +37,58 @@ document.addEventListener('DOMContentLoaded', () => {
   let daemonOnline = false;
   let lastTxSeq = null;
 
-  // Peer Selection in Radar
+  const radarPeersLayer = document.getElementById('radar-peers-layer');
+
+  function updateRadarPeers(peers) {
+    if (!radarPeersLayer || !peers || peers.length === 0) return;
+    const sorted = [...peers].sort((a, b) => b.rssi - a.rssi).slice(0, 8);
+    radarPeersLayer.innerHTML = '';
+
+    sorted.forEach((peer, idx) => {
+      const angle = (idx / sorted.length) * 2 * Math.PI - (Math.PI / 2);
+      const clampedRssi = Math.max(-95, Math.min(-45, peer.rssi || -75));
+      const dist = 70 + ((-45 - clampedRssi) / 50) * 75;
+
+      const x = Math.round(dist * Math.cos(angle));
+      const y = Math.round(dist * Math.sin(angle));
+
+      const node = document.createElement('div');
+      node.className = 'peer-node' + (selectedPeer === peer.hostname ? ' active' : '');
+      node.style.position = 'absolute';
+      node.style.left = `calc(50% + ${x}px - 23px)`;
+      node.style.top = `calc(50% + ${y}px - 23px)`;
+      node.dataset.name = peer.hostname;
+      node.dataset.mac = peer.mac;
+      node.dataset.rssi = `${peer.rssi} dBm`;
+
+      let iconClass = 'fa-solid fa-mobile-screen-button';
+      const hLower = (peer.hostname || '').toLowerCase();
+      if (hLower.includes('mac')) {
+        iconClass = 'fa-solid fa-laptop';
+      } else if (hLower.includes('ipad')) {
+        iconClass = 'fa-solid fa-tablet-screen-button';
+      }
+
+      node.innerHTML = `
+        <div class="peer-avatar">
+          <i class="${iconClass}"></i>
+        </div>
+        <span class="peer-name">${peer.hostname} (${peer.rssi} dBm)</span>
+      `;
+
+      node.addEventListener('click', () => {
+        document.querySelectorAll('.peer-node').forEach(p => p.classList.remove('active'));
+        node.classList.add('active');
+        selectedPeer = peer.hostname;
+        dropTargetLabel.innerHTML = `Ready to AirDrop to <strong>${peer.hostname}</strong> [${peer.mac}] (${peer.rssi} dBm)`;
+        addLog('AWDL', `Peer focused: ${peer.hostname} [${peer.mac}] RSSI=${peer.rssi} dBm`);
+      });
+
+      radarPeersLayer.appendChild(node);
+    });
+  }
+
+  // Peer Selection in Radar (initial static fallback)
   peerNodes.forEach(node => {
     node.addEventListener('click', () => {
       peerNodes.forEach(p => p.classList.remove('active'));
@@ -116,6 +167,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (peerCountText && typeof data.peer_count === 'number') {
         peerCountText.textContent = `${data.peer_count} Apple Device${data.peer_count === 1 ? '' : 's'} in Range`;
+      }
+      if (Array.isArray(data.peers) && data.peers.length > 0) {
+        updateRadarPeers(data.peers);
       }
 
       // Live Sequence Numbers & Packet Log

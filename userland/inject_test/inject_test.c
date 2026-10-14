@@ -287,6 +287,97 @@ static int CmdAwdlTest(HANDLE h) {
 }
 
 /* -------------------------------------------------------------------------
+ * cmd: simpeer
+ * Injects a 112-byte Apple iPhone 15 Pro AWDL PSF frame into the TX ring
+ * and, via loopback (in->Reserved[0] = 1), into ctx->RxFifo for immediate
+ * discovery by awdl-daemon and the UI radar.
+ * ------------------------------------------------------------------------- */
+static int CmdSimPeer(HANDLE h) {
+  /* Exactly 112-byte Apple AWDL PSF frame */
+  static const uint8_t simFrame[112] = {
+      /* 1. 802.11 MAC Header (24 bytes) */
+      0xD0, 0x00,                         /* FC: Mgmt Action */
+      0x00, 0x00,                         /* Duration */
+      0x00, 0x17, 0xF2, 0x00, 0x00, 0x00, /* DA: AWDL BSSID */
+      0x02, 0x17, 0xF2, 0x99, 0x88, 0x77, /* SA: iPhone 15 Pro MAC */
+      0x00, 0x17, 0xF2, 0x00, 0x00, 0x00, /* BSSID */
+      0x10, 0x00,                         /* Seq Ctrl: 1 */
+
+      /* 2. Vendor Specific Action preamble (6 bytes) */
+      0x7F,                               /* Category: Vendor Specific */
+      0x00, 0x17, 0xF2,                   /* Apple OUI */
+      0x08,                               /* AWDL Action Type */
+      0x00,                               /* AWDL Action Code (PSF = 0) */
+
+      /* 3. AWDL Fixed Header (12 bytes) */
+      0x10,                               /* Version: 1.0 */
+      0x01,                               /* Subtype */
+      0x00, 0x00,                         /* PHY Tx Time */
+      0x00, 0x20, 0x01, 0x00,             /* Target Tx Time */
+      0x01,                               /* Counter */
+      0x00,                               /* Data Path State */
+      0x24, 0x04,                         /* AWDL Seq */
+
+      /* 4. Sync TLV (0x02, len=8 -> 11 bytes) */
+      0x02, 0x08, 0x00,                   /* Tag 2, Len 8 */
+      0x2C,                               /* Next Channel: 44 */
+      0x01,                               /* Tx Counter: 1 */
+      0x2C,                               /* Master Channel: 44 */
+      0x00,                               /* Guard Time: 0 */
+      0x10, 0x00,                         /* AW Period: 16 ms */
+      0x24, 0x04,                         /* AW Seq */
+
+      /* 5. Master Election TLV (0x03, len=23 -> 26 bytes) */
+      0x03, 0x17, 0x00,                   /* Tag 3, Len 23 */
+      0x00,                               /* Flags */
+      0x02, 0x17, 0xF2, 0x99, 0x88, 0x77, /* Master ID (iPhone) */
+      0x00, 0x00, 0x20, 0x00,             /* Master Metric: 0x00200000 */
+      0x01, 0x00, 0x00, 0x00,             /* Master Counter: 1 */
+      0x00, 0x00, 0x20, 0x00,             /* Self Metric: 0x00200000 */
+      0x01, 0x00, 0x00, 0x00,             /* Self Counter: 1 */
+
+      /* 6. Peer Address & Hostname TLV (0x09, len=30 -> 33 bytes) */
+      0x09, 0x1E, 0x00,                   /* Tag 9, Len 30 (16 IP + 14 Host) */
+      /* IPv6 address: fe80::0017:f2ff:fe99:8877 */
+      0xFE, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x17, 0xF2, 0xFF, 0xFE, 0x99, 0x88, 0x77,
+      /* Hostname: "iPhone-15-Pro." (14 bytes) */
+      'i', 'P', 'h', 'o', 'n', 'e', '-', '1', '5', '-', 'P', 'r', 'o', '.'
+  };
+
+  size_t frameLen = sizeof(simFrame);
+  size_t inBufSize = sizeof(uint32_t) + sizeof(uint8_t) + 3 + frameLen;
+  uint8_t *inBuf = (uint8_t *)calloc(1, inBufSize);
+  INJECT_FRAME_IN *in;
+  DWORD bytes = 0;
+
+  if (!inBuf) {
+    fprintf(stderr, "[!] OOM\n");
+    return 1;
+  }
+
+  in = (INJECT_FRAME_IN *)inBuf;
+  in->FrameLength = (uint32_t)frameLen;
+  in->NoAck = 1;
+  in->Reserved[0] = 1; /* Request kernel RX loopback into ctx->RxFifo */
+  memcpy(in->FrameData, simFrame, frameLen);
+
+  printf("[*] Simulating Apple iPhone 15 Pro AWDL PSF frame (%zu bytes, loopback=1)...\n", frameLen);
+  printf("    SA: 02:17:F2:99:88:77 | Hostname: iPhone-15-Pro | Metric: 0x00200000\n");
+
+  if (!DeviceIoControl(h, IOCTL_AWDL_INJECT_FRAME, inBuf, (DWORD)inBufSize,
+                       NULL, 0, &bytes, NULL)) {
+    fprintf(stderr, "[!] INJECT_FRAME ioctl failed: %lu\n", GetLastError());
+    free(inBuf);
+    return 1;
+  }
+
+  printf("[+] Successfully injected iPhone 15 Pro frame into TX ring & RX FIFO!\n");
+  free(inBuf);
+  return 0;
+}
+
+/* -------------------------------------------------------------------------
  * cmd: read [timeout_ms]
  * Poll for incoming raw 802.11 frames and pretty-print them.
  * ------------------------------------------------------------------------- */
@@ -357,6 +448,7 @@ int main(int argc, char *argv[]) {
     printf("  inject_test inject <hexbytes>   e.g. D00000...\n");
     printf("  inject_test read [timeout_ms]   default 5000\n");
     printf("  inject_test awdltest            send minimal AWDL PSF frame\n");
+    printf("  inject_test simpeer             inject 112-byte Apple iPhone 15 Pro (loopback=1)\n");
     return 0;
   }
 
@@ -379,6 +471,9 @@ int main(int argc, char *argv[]) {
 
   } else if (strcmp(argv[1], "awdltest") == 0) {
     ret = CmdAwdlTest(h);
+
+  } else if (strcmp(argv[1], "simpeer") == 0) {
+    ret = CmdSimPeer(h);
 
   } else {
     fprintf(stderr, "[!] Unknown command: %s\n", argv[1]);

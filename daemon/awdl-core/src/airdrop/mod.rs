@@ -8,6 +8,8 @@
 
 pub mod bonjour;
 pub mod server;
+pub mod ble;
 
 pub use bonjour::AirDropBonjour;
 pub use server::AirDropServer;
+pub use ble::AirDropBleService;
