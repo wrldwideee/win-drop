@@ -10,3 +10,4 @@ Release/
 *.recipe
 *.log
 *disasm*.txt
+downloads/

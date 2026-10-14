@@ -116,7 +116,11 @@ async fn main() -> anyhow::Result<()> {
 
     // --- Phase 4: AirDrop Server & Bonjour Discovery ---
     let download_dir = PathBuf::from("downloads").join("AirDrop");
-    let server = Arc::new(AirDropServer::new(download_dir));
+    let server = Arc::new(AirDropServer::new(
+        download_dir,
+        Arc::clone(&radio),
+        Arc::clone(&state),
+    ));
     let t_server = tokio::spawn(async move {
         let addr = "[::]:8770".parse().expect("Valid IPv6 bind address");
         if let Err(e) = server.run(addr).await {
