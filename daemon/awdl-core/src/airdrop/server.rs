@@ -578,6 +578,18 @@ async fn handle_http_stream<S>(
         let header_end = buf[..n].windows(4).position(|w| w == b"\r\n\r\n");
         let payload_offset = header_end.map(|idx| idx + 4).unwrap_or(n);
 
+        // Parse Content-Length header if present
+        let mut content_length = None;
+        for line in req.lines() {
+            let lower = line.to_lowercase();
+            if lower.starts_with("content-length:") {
+                if let Ok(cl) = line["content-length:".len()..].trim().parse::<usize>() {
+                    content_length = Some(cl);
+                }
+                break;
+            }
+        }
+
         // Check for X-File-Name header
         let mut custom_filename = None;
         for line in req.lines() {
@@ -597,32 +609,52 @@ async fn handle_http_stream<S>(
             raw_data.extend_from_slice(&buf[payload_offset..n]);
         }
         let mut stream_buf = [0u8; 32 * 1024];
-        while let Ok(bytes_read) = stream.read(&mut stream_buf).await {
-            if bytes_read == 0 { break; }
-            raw_data.extend_from_slice(&stream_buf[..bytes_read]);
-        }
-
-        // Check if stream is gzip compressed (magic bytes: 0x1F, 0x8B)
-        let is_gzip = raw_data.len() >= 2 && raw_data[0] == 0x1F && raw_data[1] == 0x8B;
-        let final_data = if is_gzip {
-            info!("Decompressing incoming gzip/cpio AirDrop archive (flate2)...");
-            let mut decoder = GzDecoder::new(&raw_data[..]);
-            let mut decompressed = Vec::new();
-            if decoder.read_to_end(&mut decompressed).is_ok() && !decompressed.is_empty() {
-                decompressed
-            } else {
-                raw_data
+        if let Some(cl) = content_length {
+            while raw_data.len() < cl {
+                let needed = cl - raw_data.len();
+                let to_read = needed.min(stream_buf.len());
+                match stream.read(&mut stream_buf[..to_read]).await {
+                    Ok(0) => break,
+                    Ok(bytes_read) => raw_data.extend_from_slice(&stream_buf[..bytes_read]),
+                    Err(_) => break,
+                }
             }
         } else {
-            raw_data
-        };
+            while let Ok(bytes_read) = stream.read(&mut stream_buf).await {
+                if bytes_read == 0 { break; }
+                raw_data.extend_from_slice(&stream_buf[..bytes_read]);
+            }
+        }
 
-        let target_filename = if let Some(fname) = custom_filename {
-            fname
+        // Check if incoming payload is a CPIO archive (.cpio.gz or raw CPIO)
+        let (target_filename, final_data) = if let Some((cpio_name, cpio_bytes)) = super::cpio::extract_cpio_gz_or_raw(&raw_data) {
+            info!(file = %cpio_name, bytes = cpio_bytes.len(), "Extracted file from incoming AirDrop .cpio.gz archive");
+            let name = custom_filename.unwrap_or(cpio_name);
+            (name, cpio_bytes)
         } else {
-            let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-            let ext = if is_gzip { "tar" } else { "bin" };
-            format!("AirDrop_Received_{}.{}", timestamp, ext)
+            // Check if stream is gzip compressed (magic bytes: 0x1F, 0x8B)
+            let is_gzip = raw_data.len() >= 2 && raw_data[0] == 0x1F && raw_data[1] == 0x8B;
+            let decompressed = if is_gzip {
+                info!("Decompressing incoming gzip archive (flate2)...");
+                let mut decoder = GzDecoder::new(&raw_data[..]);
+                let mut out = Vec::new();
+                if decoder.read_to_end(&mut out).is_ok() && !out.is_empty() {
+                    out
+                } else {
+                    raw_data
+                }
+            } else {
+                raw_data
+            };
+
+            let name = if let Some(fname) = custom_filename {
+                fname
+            } else {
+                let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                let ext = if is_gzip { "tar" } else { "bin" };
+                format!("AirDrop_Received_{}.{}", timestamp, ext)
+            };
+            (name, decompressed)
         };
 
         let file_path = download_dir.join(&target_filename);
@@ -657,6 +689,129 @@ async fn handle_http_stream<S>(
         );
         let _ = stream.write_all(resp.as_bytes()).await;
         let _ = stream.write_all(&body).await;
+        return;
+    }
+
+    // AirDrop Dispatcher API: POST /api/send
+    if req.starts_with("POST /api/send") {
+        info!(peer = %peer_addr, "Received POST /api/send outbound file dispatch request");
+        let header_end = buf[..n].windows(4).position(|w| w == b"\r\n\r\n");
+        let payload_offset = header_end.map(|idx| idx + 4).unwrap_or(n);
+
+        // Parse Content-Length header if present
+        let mut content_length = None;
+        for line in req.lines() {
+            let lower = line.to_lowercase();
+            if lower.starts_with("content-length:") {
+                if let Ok(cl) = line["content-length:".len()..].trim().parse::<usize>() {
+                    content_length = Some(cl);
+                }
+                break;
+            }
+        }
+
+        let mut custom_filename = None;
+        let mut target_peer_str = None;
+
+        for line in req.lines() {
+            let lower = line.to_lowercase();
+            if lower.starts_with("x-file-name:") {
+                let val = line["x-file-name:".len()..].trim();
+                if !val.is_empty() {
+                    custom_filename = Some(sanitize_filename(val));
+                }
+            } else if lower.starts_with("x-target-peer:") {
+                let val = line["x-target-peer:".len()..].trim();
+                if !val.is_empty() {
+                    target_peer_str = Some(val.to_string());
+                }
+            }
+        }
+
+        let filename = custom_filename.unwrap_or_else(|| "shared_file.bin".to_string());
+
+        // Accumulate full incoming payload
+        let mut file_data = Vec::new();
+        if payload_offset < n {
+            file_data.extend_from_slice(&buf[payload_offset..n]);
+        }
+        let mut stream_buf = [0u8; 32 * 1024];
+        if let Some(cl) = content_length {
+            while file_data.len() < cl {
+                let needed = cl - file_data.len();
+                let to_read = needed.min(stream_buf.len());
+                match stream.read(&mut stream_buf[..to_read]).await {
+                    Ok(0) => break,
+                    Ok(bytes_read) => file_data.extend_from_slice(&stream_buf[..bytes_read]),
+                    Err(_) => break,
+                }
+            }
+        } else {
+            while let Ok(bytes_read) = stream.read(&mut stream_buf).await {
+                if bytes_read == 0 { break; }
+                file_data.extend_from_slice(&stream_buf[..bytes_read]);
+            }
+        }
+
+        // Resolve target destination address
+        let target_addr: SocketAddr = match target_peer_str.as_deref() {
+            Some(s) if s.parse::<SocketAddr>().is_ok() => s.parse::<SocketAddr>().unwrap(),
+            Some(s) if s.contains('.') && !s.contains(':') => {
+                SocketAddr::new(s.parse::<std::net::IpAddr>().unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)), 8770)
+            }
+            Some(s) if s.trim_matches(|c| c == '[' || c == ']').parse::<std::net::IpAddr>().is_ok() => {
+                SocketAddr::new(s.trim_matches(|c| c == '[' || c == ']').parse::<std::net::IpAddr>().unwrap(), 8770)
+            }
+            Some(host_or_name) if !host_or_name.is_empty() && host_or_name != "loopback" && host_or_name != "self" => {
+                let st = state_ref.lock().await;
+                let found_peer = st.peers.values().find(|p| {
+                    p.hostname.as_deref().map(|h| h.to_lowercase().contains(&host_or_name.to_lowercase())).unwrap_or(false)
+                }).cloned();
+                drop(st);
+
+                if let Some(p) = found_peer {
+                    if let Some(ip) = p.ipv6 {
+                        SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::from(ip)), 8770)
+                    } else {
+                        "127.0.0.1:8770".parse().unwrap()
+                    }
+                } else {
+                    "127.0.0.1:8770".parse().unwrap()
+                }
+            }
+            _ => "127.0.0.1:8770".parse().unwrap(),
+        };
+
+        info!(target = %target_addr, file = %filename, bytes = file_data.len(), "Dispatching via AirDropClient");
+        match super::client::AirDropClient::send_file(target_addr, &filename, &file_data).await {
+            Ok(()) => {
+                let body = format!("{{\"ok\":true,\"filename\":\"{}\",\"target\":\"{}\",\"bytes_sent\":{}}}", filename, target_addr, file_data.len());
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\n\
+                    Content-Type: application/json\r\n\
+                    Access-Control-Allow-Origin: *\r\n\
+                    Content-Length: {}\r\n\
+                    Connection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(resp.as_bytes()).await;
+            }
+            Err(e) => {
+                warn!(err = ?e, "AirDropClient::send_file failed");
+                let body = format!("{{\"ok\":false,\"error\":\"{}\"}}", e);
+                let resp = format!(
+                    "HTTP/1.1 500 Internal Server Error\r\n\
+                    Content-Type: application/json\r\n\
+                    Access-Control-Allow-Origin: *\r\n\
+                    Content-Length: {}\r\n\
+                    Connection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(resp.as_bytes()).await;
+            }
+        }
         return;
     }
 

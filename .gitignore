@@ -11,3 +11,4 @@ Release/
 *.log
 *disasm*.txt
 downloads/
+scratch/

@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Real File Upload to Win-Drop AirDrop Engine via POST /Ask & POST /Upload
+  // Real File Upload to Win-Drop AirDrop Engine via POST /api/send (with fallback to /Upload)
   async function handleFiles(files) {
     if (!files || files.length === 0) return;
     transferProgressBox.style.display = 'block';
@@ -337,44 +337,56 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = files[i];
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
       transferFilename.textContent = `AirDropping "${file.name}" (${sizeMb} MB) to ${selectedPeer}...`;
-      transferBar.style.width = '15%';
-      transferRate.textContent = 'Negotiating /Ask...';
+      transferBar.style.width = '20%';
+      transferRate.textContent = 'Negotiating...';
 
-      addLog('AirDrop', `Initiating POST /Ask for "${file.name}" (${file.size} bytes) to ${selectedPeer}`, true);
+      addLog('AirDrop', `Initiating AirDrop send for "${file.name}" (${file.size} bytes) -> target: ${selectedPeer}`, true);
 
       try {
-        // Step 1: Propose transfer via POST /Ask
-        await fetch(`${API_BASE}/Ask`, {
-          method: 'POST',
-          headers: { 'Accept': 'application/json' },
-          body: JSON.stringify({ filename: file.name, size: file.size })
-        });
-        transferBar.style.width = '35%';
-        transferRate.textContent = 'Streaming /Upload...';
-
-        // Step 2: Stream file payload via POST /Upload with X-File-Name preserved
-        addLog('AirDrop', `Streaming payload chunks for "${file.name}" with preserved filename...`, true);
         const startTime = Date.now();
-        const uploadRes = await fetch(`${API_BASE}/Upload`, {
+        transferBar.style.width = '50%';
+        transferRate.textContent = 'Packaging .cpio.gz & sending...';
+
+        // Dispatch via POST /api/send to trigger full AirDropClient pipeline
+        const sendRes = await fetch(`${API_BASE}/api/send`, {
           method: 'POST',
           headers: {
             'X-File-Name': encodeURIComponent(file.name),
+            'X-Target-Peer': encodeURIComponent(selectedPeer),
             'Content-Type': file.type || 'application/octet-stream'
           },
           body: file
         });
 
-        const elapsedSec = Math.max(0.05, (Date.now() - startTime) / 1000);
-        const speedMbS = (file.size / (1024 * 1024) / elapsedSec).toFixed(1);
+        if (sendRes.ok) {
+          const resData = await sendRes.json();
+          const elapsedSec = Math.max(0.05, (Date.now() - startTime) / 1000);
+          const speedMbS = (file.size / (1024 * 1024) / elapsedSec).toFixed(1);
 
-        if (uploadRes.ok) {
           transferBar.style.width = '100%';
-          transferRate.textContent = `${speedMbS} MB/s (Saved!)`;
+          transferRate.textContent = `${speedMbS} MB/s (Complete!)`;
           txCount += Math.max(1, Math.ceil(file.size / 1400));
           txCounter.textContent = txCount.toLocaleString();
-          addLog('AirDrop', `Transfer complete! "${file.name}" verified & saved in downloads/AirDrop (${speedMbS} MB/s)`, true);
+          addLog('AirDrop', `AirDrop transfer complete! "${file.name}" sent to ${resData.target || selectedPeer} (${speedMbS} MB/s)`, true);
         } else {
-          throw new Error(`Server returned HTTP ${uploadRes.status}`);
+          // If /api/send returned error or offline, fallback to direct /Upload
+          addLog('AirDrop', `/api/send fallback -> Direct ingest into downloads/AirDrop`, true);
+          transferBar.style.width = '70%';
+          const uploadRes = await fetch(`${API_BASE}/Upload`, {
+            method: 'POST',
+            headers: {
+              'X-File-Name': encodeURIComponent(file.name),
+              'Content-Type': file.type || 'application/octet-stream'
+            },
+            body: file
+          });
+          if (uploadRes.ok) {
+            transferBar.style.width = '100%';
+            transferRate.textContent = 'Saved!';
+            addLog('AirDrop', `Ingest complete: "${file.name}" saved in downloads/AirDrop`, true);
+          } else {
+            throw new Error(`Upload returned status ${uploadRes.status}`);
+          }
         }
       } catch (err) {
         addLog('AirDrop', `Transfer error for "${file.name}": ${err.message}`, true);
@@ -387,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
       transferRate.textContent = 'Idle';
     }, 4000);
 
-    // Refresh telemetry immediately to show the newly saved file
+    // Refresh telemetry immediately
     pollDaemonStatus();
   }
 

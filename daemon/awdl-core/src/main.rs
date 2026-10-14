@@ -76,6 +76,41 @@ async fn main() -> anyhow::Result<()> {
 
     info!("WIN-DROP awdl-daemon starting");
 
+    // --- Check for CLI --send flag (OpenDrop send equivalent) ---
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(pos) = args.iter().position(|a| a == "--send") {
+        if pos + 1 < args.len() {
+            let file_path = PathBuf::from(&args[pos + 1]);
+            let target_str = args
+                .iter()
+                .position(|a| a == "--peer")
+                .and_then(|p| args.get(p + 1))
+                .cloned()
+                .unwrap_or_else(|| "127.0.0.1:8770".to_string());
+
+            let target_addr: std::net::SocketAddr = target_str
+                .parse()
+                .unwrap_or_else(|_| "127.0.0.1:8770".parse().unwrap());
+
+            info!(
+                path = ?file_path,
+                target = %target_addr,
+                "CLI Send flag detected — sending file via AirDropClient"
+            );
+
+            match airdrop::AirDropClient::send_file_from_path(target_addr, &file_path).await {
+                Ok(()) => {
+                    info!("AirDrop send succeeded!");
+                    return Ok(());
+                }
+                Err(e) => {
+                    error!("AirDrop send failed: {:?}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
     // --- Probe kernel driver device or fallback to Hybrid Wi-Fi mode ---
     let radio_opt: Option<Arc<RadioDevice>> = match RadioDevice::open() {
         Ok(r) => match r.get_status() {
